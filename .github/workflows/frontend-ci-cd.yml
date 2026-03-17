@@ -1,0 +1,84 @@
+name: Frontend CI/CD
+# Triggered on push or pull request to main branch.
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Global environment variable available to all jobs
+env:
+  REGION: 'us-east-1'
+
+jobs:
+
+  # ============================================================
+  # JOB 1: Build and push frontend image to ECR
+  # ============================================================
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Authenticates with AWS using IAM credentials stored as secrets
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Logs in to ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Builds the frontend Docker image and pushes it with two tags
+      # A unique tag using the Git commit SHA
+      # And the 'latest' tag
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: frontend-repo
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG app/frontend
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest app/frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # ============================================================
+  # JOB 2: Deploy new image to EKS 
+  # ============================================================
+  deploy-to-cluster:
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Authenticates with AWS 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Installs kubectl
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      # Generates a kubeconfig file so kubectl can connect to EKS cluster
+      # Then, Rolling update
+      - name: Roll update
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          CLUSTER_NAME: main_cluster_eks
+        run: |
+          aws eks update-kubeconfig --region ${{ env.REGION }} --name ${{ env.CLUSTER_NAME }}
+          kubectl set image deployment/frontend-deployment frontend-app=$ECR_REGISTRY/frontend-repo:$IMAGE_TAG
