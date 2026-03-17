@@ -1,0 +1,10 @@
+aws_region             = "us-east-1"
+availability_zones     = ["us-east-1a", "us-east-1b"]
+vpc_cidr               = "172.16.0.0/16"
+public_subnet_cidr     = ["172.16.1.0/24", "172.16.2.0/24"]
+private_subnet_cidr    = ["172.16.3.0/24", "172.16.4.0/24"]
+private_db_subnet_cidr = ["172.16.5.0/24", "172.16.6.0/24"]
+db_username            = "USER"
+db_password            = "PASSWORD"
+frontend_image_uri     = "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/frontend-repo:latest"
+backend_image_uri      = "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/backend-repo:latest"
