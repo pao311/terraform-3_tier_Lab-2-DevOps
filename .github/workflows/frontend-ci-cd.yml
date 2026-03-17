@@ -76,7 +76,7 @@ jobs:
       # Then, Rolling update
       - name: Roll update
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
           IMAGE_TAG: ${{ github.sha }}
           CLUSTER_NAME: main_cluster_eks
         run: |
